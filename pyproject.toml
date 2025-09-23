@@ -6,8 +6,27 @@ readme = "README.md"
 authors = [
     { name = "emilyhunt", email = "emily.hunt.physics@gmail.com" }
 ]
-requires-python = ">=3.12"
-dependencies = []
+requires-python = ">=3.10"
+dependencies = [
+    "astropy>=5.0.0",
+    "astropy-healpix>=1.0.0",
+    "astroquery>=0.4.0",
+    "gaiaunlimited>=0.3.0",
+    "xgboost>=3.0.0",
+    "pandas>=1.0.0",
+    "pyarrow", # Required for parquet files
+    "tqdm>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "ruff",
+]
+notebooks = [
+  "notebook>=6.0.0",  # Jupyter notebook support
+  "ocelot==0.4.5",  # EXACT version used by original paper!
+]
 
 [build-system]
 requires = ["hatchling"]

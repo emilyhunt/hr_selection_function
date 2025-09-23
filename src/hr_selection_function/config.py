@@ -10,7 +10,7 @@ _CONFIG = dict()
 
 # Some helpers for config things
 def set_data_directory(directory: Path | str):
-    """User-facing function for the 
+    """User-facing function for the
 
     Parameters
     ----------
@@ -19,8 +19,7 @@ def set_data_directory(directory: Path | str):
         The specified directory will be checked for validity
     """
     directory, first_time = _setup_data_directory(directory)
-    _CONFIG['data_dir'], _CONFIG['first_run'] = directory, first_time
-
+    _CONFIG["data_dir"], _CONFIG["first_run"] = directory, first_time
 
 
 def _setup_data_directory(directory: Path | str) -> tuple[Path, bool]:
@@ -35,10 +34,10 @@ def _setup_data_directory(directory: Path | str) -> tuple[Path, bool]:
                 f"Unable to cast user-specified directory '{directory}' into a path. "
                 "Are you sure it is a valid path on your operating system?"
             )
-        
+
     if not isinstance(directory, Path):
         raise ValueError("Data directory path must be a pathlib.Path or string.")
-    
+
     # Make the directory
     first_time = False
     if not directory.exists():
