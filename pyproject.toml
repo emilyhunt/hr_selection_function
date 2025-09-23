@@ -1,0 +1,14 @@
+[project]
+name = "hr-selection-function"
+version = "0.1.0"
+description = "Selection function for the Hunt & Reffert 2024 open cluster catalogue."
+readme = "README.md"
+authors = [
+    { name = "emilyhunt", email = "emily.hunt.physics@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
