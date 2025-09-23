@@ -1,6 +1,15 @@
+from hr_selection_function.data import requires_data
+
+
 class HR24SelectionFunction:
-    pass
+    # Todo
+    @requires_data
+    def __init__(self):
+        pass
 
 
 class NStarsPredictor:
-    pass
+    # Todo
+    @requires_data
+    def __init__(self):
+        pass
