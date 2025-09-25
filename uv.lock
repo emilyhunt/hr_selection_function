@@ -985,7 +985,7 @@ requires-dist = [
     { name = "pyarrow" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'" },
-    { name = "tqdm", specifier = ">=4.67.1" },
+    { name = "tqdm", specifier = ">=3.0.0" },
     { name = "xgboost", specifier = ">=3.0.0" },
 ]
 provides-extras = ["dev", "notebooks"]

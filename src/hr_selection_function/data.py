@@ -3,6 +3,7 @@ from hr_selection_function.config import _CONFIG
 from tqdm import tqdm
 from pathlib import Path
 from functools import wraps
+import shutil
 
 
 def set_data_directory(directory: Path | str):
@@ -27,6 +28,10 @@ def download_data(redownload: bool = False):
         return
 
     _download_file(_CONFIG["data_url"], unzip=True, write_location=_CONFIG["data_dir"])
+    if not _check_data_downloaded():
+        raise RuntimeError(
+            "Data download failed. Data is not as expected, or where it should be."
+        )
     _CONFIG["data_already_downloaded"] = True
 
 
@@ -34,10 +39,12 @@ def requires_data(func):
     """Wrapper for some function func that ensures that the data directory has been
     created before proceeding.
     """
+
     @wraps(func)
     def inner(*args, **kwargs):
         download_data(redownload=False)
         func(*args, **kwargs)
+
     return inner
 
 
@@ -51,35 +58,39 @@ def _download_file(
         write_location = _CONFIG["data_dir"]
     write_location = Path(write_location)
 
-    print(f"Downloading data for hr_selection_function to {write_location}")
-
     if unzip:
         write_location = write_location / "_temp.zip"
 
+    print(f"Downloading data for hr_selection_function to {write_location}")
+
     # Fetch initial dataset
     response = requests.get(data_link, stream=True)
-    with tqdm.wrapattr(
-        open(write_location, "wb"),
-        "write",
-        unit="GB",
-        unit_scale=True,
-        unit_divisor=1024**3,
-        miniters=1,
-        desc="Data",
-        total=int(response.headers.get("content-length", 0)),
-    ) as file:
-        for chunk in response.iter_content(chunk_size=4096):
-            file.write(chunk)
+    with open(write_location, "wb") as handle:
+        with tqdm.wrapattr(
+            handle,
+            "write",
+            unit="GB",
+            unit_scale=True,
+            unit_divisor=1024**3,
+            miniters=1,
+            desc="Data",
+            total=int(response.headers.get("content-length", 0)),
+        ) as file:
+            for chunk in response.iter_content(chunk_size=4096):
+                file.write(chunk)
 
     if not unzip:
         return
 
     # Unzip data
-    print("Unzipping data...")
-    # Todo
+    print(f"Unzipping data to {write_location}")
+    shutil.unpack_archive(write_location, write_location.parent)
 
     # Delete raw .zip file
-    print("Removing .zip file...")
+    print(f"Removing .zip file at {write_location}")
+    write_location.unlink()
+
+    print("Data downloaded!")
 
 
 def _check_data_directory(directory: Path | str) -> tuple[Path, bool]:
@@ -107,12 +118,14 @@ def _check_data_directory(directory: Path | str) -> tuple[Path, bool]:
             f"{directory}..."
         )
         directory.mkdir(parents=True)
-        first_time = False
+        first_time = True
 
     return directory, first_time
 
 
 def _check_data_downloaded(directory: Path | None = None) -> bool:
+    # Todo this function should really check file size too
+    
     if directory is None:
         directory = _CONFIG["data_dir"]
     directory = Path(directory)
