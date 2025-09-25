@@ -135,5 +135,9 @@ def test_set_data_directory():
         assert _CONFIG["first_run"]
         assert _CONFIG["data_already_downloaded"] is False
 
+        # Now reset it
+        set_data_directory(_DEFAULT_DIRECTORY)
+        assert _CONFIG["data_dir"] == _DEFAULT_DIRECTORY
+
     finally:
         shutil.rmtree(location)
