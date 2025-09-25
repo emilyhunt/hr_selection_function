@@ -2,33 +2,112 @@ from hr_selection_function.data import requires_data
 from numpy.typing import ArrayLike
 import pandas as pd
 from hr_selection_function.config import _CONFIG
+from hr_selection_function.math import (
+    vectorized_1d_interpolation,
+    vectorized_multivariate_normal,
+)
+import numpy as np
+import healpy as hp
 
 
-class GaiaDensityEstimator():
+class GaiaDensityEstimator:
+    _N_BINS = 21
+    _HP7_PIXEL_AREA = hp.nside2pixarea(2**7, degrees=True)
+    _HP5_FIELD_AREA = hp.nside2pixarea(2**5, degrees=True) * 9
+
     @requires_data
     def __init__(self):
-        self._map = pd.read_parquet(_CONFIG['data_dir'] / "density_hp7.parquet")
+        self._map = pd.read_parquet(
+            _CONFIG["data_dir"] / "m10_hp7.parquet"
+        )  # Todo make this
 
-    def __call__(self, l: ArrayLike, b: ArrayLike):
-        # Todo
-        pass
+    def __call__(self, l, b, pmra, pmdec, parallax):
+        """Estimates the density within a given region based on a pre-computed set of
+        multivariate Gaussian fits in HEALPix level 7 bins.
+
+        l, b, etc. can all be arrays, but should always have the same shape.
+
+        Takes upto 1 second per 100,000 points.
+        """
+        # Todo: check shapes too
+        l, b, pmra, pmdec, parallax = (
+            np.atleast_1d(l),
+            np.atleast_1d(b),
+            np.atleast_1d(pmra),
+            np.atleast_1d(pmdec),
+            np.atleast_1d(parallax),
+        )
+        if np.any(parallax > 2) or np.any(parallax < 0):
+            raise ValueError(
+                "Parallax must be positive and less than 2 mas (i.e. distance > 500 pc.)"
+            )
+
+        # Get indices of everything to fetch
+        id_pix = hp.ang2pix(2**7, l, b, nest=True, lonlat=True)
+        df_indices = self._generate_dataframe_indices(id_pix)
+
+        # Perform interpolations
+        parallax_map = self._map.loc[df_indices, "parallax"].to_numpy().reshape(-1, 21)
+        values = dict()
+        for col in (
+            "mean_0",
+            "mean_1",
+            "cov_0",
+            "cov_1",
+            "cov_3",
+            "n_stars_per_mas",
+        ):
+            values[col] = vectorized_1d_interpolation(
+                parallax,
+                parallax_map,
+                self._map.loc[df_indices, col].to_numpy().reshape(-1, 21),
+            )
+
+        # Since the matrix is symmetric, we skip this one
+        values["cov_2"] = values["cov_1"]
+
+        # Query the multivar normal
+        proper_motions = np.asarray([pmra, pmdec]).T
+        means = np.asarray([values["mean_0"], values["mean_1"]]).T
+        covariances = np.asarray([values[f"cov_{i}"] for i in range(4)]).T.reshape(
+            -1, 2, 2
+        )
+
+        normal_values = vectorized_multivariate_normal(
+            proper_motions, means, covariances
+        )
+
+        density_per_degree = (
+            values["n_stars_per_mas"] * normal_values / self._HP7_PIXEL_AREA
+        )
+
+        return density_per_degree * self._HP5_FIELD_AREA
+
+    def _generate_dataframe_indices(self, id_pix):
+        return (
+            self._N_BINS * id_pix.reshape(-1, 1) + np.arange(self._N_BINS)
+        ).flatten()
 
 
-class M10Estimator():
+class M10Estimator:
     @requires_data
     def __init__(self):
-        self._map = pd.read_parquet(_CONFIG['data_dir'] / "m10_hp7.parquet")  # Todo make this
+        self._map = pd.read_parquet(
+            _CONFIG["data_dir"] / "m10_hp7.parquet"
+        )  # Todo make this
 
-    def __call__(self, l: ArrayLike, b: ArrayLike):
-        # Todo
-        pass
+    def __call__(self, ra: ArrayLike, dec: ArrayLike):
+        healpix_level_7 = hp.ang2pix(2**7, ra, dec, nest=True, lonlat=True)
+
+        # Todo will need to change when using .parquet map
+        return self._map[healpix_level_7, 2]
 
 
-class MSubsampleEstimator():
+class MSubsampleEstimator:
     @requires_data
     def __init__(self):
-        self._map = pd.read_parquet(_CONFIG['data_dir'] / "subsample_cuts_hp7.parquet")
+        self._map = pd.read_parquet(_CONFIG["data_dir"] / "subsample_cuts_hp7.parquet")
 
     def __call__(self, l: ArrayLike, b: ArrayLike):
-        # Todo
-        pass
+        healpix_level_7_galactic = hp.ang2pix(2**7, l, b, nest=True, lonlat=True)
+        return self._map.loc[healpix_level_7_galactic, "median_mag"].to_numpy()
