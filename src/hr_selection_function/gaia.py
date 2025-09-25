@@ -21,13 +21,44 @@ class GaiaDensityEstimator:
             _CONFIG["data_dir"] / "m10_hp7.parquet"
         )  # Todo make this
 
-    def __call__(self, l, b, pmra, pmdec, parallax):
+    def __call__(
+        self,
+        l: ArrayLike,
+        b: ArrayLike,
+        pmra: ArrayLike,
+        pmdec: ArrayLike,
+        parallax: ArrayLike,
+    ) -> ArrayLike:
         """Estimates the density within a given region based on a pre-computed set of
         multivariate Gaussian fits in HEALPix level 7 bins.
 
         l, b, etc. can all be arrays, but should always have the same shape.
 
         Takes upto 1 second per 100,000 points.
+
+        Parameters
+        ----------
+        l : ArrayLike
+            Galactic longitudes of points to query [in degrees].
+        b : ArrayLike
+            Galactic latitudes of points to query [in degrees].
+        pmra : ArrayLike
+            Galactic latitudes of points to query [in mas/yr].
+        pmdec : ArrayLike
+            Galactic latitudes of points to query [in mas/yr].
+        parallax : ArrayLike
+            Galactic latitudes of points to query [in mas].
+
+        Returns
+        -------
+        ArrayLike
+            Array of stellar density estimates, measured per mas^-3 yr^2 per HR23
+            clustering field, at the chosen l/b/pmra/pmdec/parallax.
+
+        Raises
+        ------
+        ValueError
+            When parallax values are outside of allowed range.
         """
         # Todo: check shapes too
         l, b, pmra, pmdec, parallax = (
@@ -96,11 +127,25 @@ class M10Estimator:
             _CONFIG["data_dir"] / "m10_hp7.parquet"
         )  # Todo make this
 
-    def __call__(self, ra: ArrayLike, dec: ArrayLike):
+    def __call__(self, ra: ArrayLike, dec: ArrayLike) -> ArrayLike:
+        """Returns value of m10 from Cantat-Gaudin+23 at the given ra/dec specified.
+
+        Parameters
+        ----------
+        ra : ArrayLike
+            Right ascension of points to query [in degrees].
+        dec : ArrayLike
+            Declination of points to query [in degrees].
+
+        Returns
+        -------
+        ArrayLike
+            Values of m10 at the specified ra/dec.
+        """
         healpix_level_7 = hp.ang2pix(2**7, ra, dec, nest=True, lonlat=True)
 
         # Todo will need to change when using .parquet map
-        return self._map[healpix_level_7, 2]
+        return self._map[healpix_level_7, 2].to_numpy()
 
 
 class MSubsampleEstimator:
@@ -108,6 +153,21 @@ class MSubsampleEstimator:
     def __init__(self):
         self._map = pd.read_parquet(_CONFIG["data_dir"] / "subsample_cuts_hp7.parquet")
 
-    def __call__(self, l: ArrayLike, b: ArrayLike):
+    def __call__(self, l: ArrayLike, b: ArrayLike) -> ArrayLike:
+        """Estimates the median magnitude of stars removed from Gaia data by HR23's
+        subsample cuts at the given l and b values.
+
+        Parameters
+        ----------
+        l : ArrayLike
+            Galactic longitudes of points to query [in degrees].
+        b : ArrayLike
+            Galactic latitudes of points to query [in degrees].
+
+        Returns
+        -------
+        ArrayLike
+            Values of m_subsample at the specified l/b.
+        """
         healpix_level_7_galactic = hp.ang2pix(2**7, l, b, nest=True, lonlat=True)
         return self._map.loc[healpix_level_7_galactic, "median_mag"].to_numpy()
