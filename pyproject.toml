@@ -11,7 +11,7 @@ dependencies = [
     "astropy>=5.0.0",
     "astropy-healpix>=1.0.0",
     "astroquery>=0.4.0",
-    "gaiaunlimited>=0.3.0",
+    # "gaiaunlimited>=0.3.0",
     "xgboost>=3.0.0",
     "pandas>=1.0.0",
     "pyarrow", # Required for parquet files
