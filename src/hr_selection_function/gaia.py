@@ -17,14 +17,12 @@ class GaiaDensityEstimator:
 
     @requires_data
     def __init__(self):
-        self._map = pd.read_parquet(
-            _CONFIG["data_dir"] / "m10_hp7.parquet"
-        )  # Todo make this
+        self._map = pd.read_parquet(_CONFIG["data_dir"] / "density_hp7.parquet")
 
     def __call__(
         self,
-        l: ArrayLike,
-        b: ArrayLike,
+        l: ArrayLike,  # noqa: E741
+        b: ArrayLike,  # noqa: E741
         pmra: ArrayLike,
         pmdec: ArrayLike,
         parallax: ArrayLike,
@@ -61,26 +59,41 @@ class GaiaDensityEstimator:
             When parallax values are outside of allowed range, or when shapes of
             arguments mismatch.
         """
-        # Todo: check shapes too
-        l, b, pmra, pmdec, parallax = (
+        l, b, pmra, pmdec, parallax = (  # noqa: E741
             np.atleast_1d(l),
             np.atleast_1d(b),
             np.atleast_1d(pmra),
             np.atleast_1d(pmdec),
             np.atleast_1d(parallax),
         )
+        self._check_call_arguments(l, b, pmra, pmdec, parallax)
+        df_indices = self._generate_dataframe_indices(l, b)
+        map_values = self._interpolate_values(df_indices, parallax)
+        pdf_values = self._query_multivariate_normal(map_values, pmra, pmdec)
+        density_per_field = self._convert_pdf_to_field_dens(map_values, pdf_values)
+        return density_per_field
+
+    def _check_call_arguments(self, l, b, pmra, pmdec, parallax):  # noqa: E741
         if not l.shape == b.shape == pmra.shape == pmdec.shape == parallax.shape:
             raise ValueError("Shapes of arguments must match.")
         if np.any(parallax > 2) or np.any(parallax < 0):
             raise ValueError(
-                "Parallax must be positive and less than 2 mas (i.e. distance > 500 pc.)"
+                "Parallax must be positive and less than 2 mas (i.e. distance > 500 pc)"
             )
 
-        # Get indices of everything to fetch
+    def _generate_dataframe_indices(self, l, b):  # noqa: E741
+        """The dataframe the map is stored in is 2D, but should really be 3D - this
+        quick indexing function grabs all required info at a given pixel.
+        """
         id_pix = hp.ang2pix(2**7, l, b, nest=True, lonlat=True)
-        df_indices = self._generate_dataframe_indices(id_pix)
+        id_bin = self._N_BINS * id_pix
+        id_all_bins = (id_bin.reshape(-1, 1) + np.arange(self._N_BINS)).flatten()
+        return id_all_bins
 
-        # Perform interpolations
+    def _interpolate_values(self, df_indices, parallax):
+        """Interpolates all relevant values on the map between neighboring parallax
+        bins of our query point at a given parallax.
+        """
         parallax_map = self._map.loc[df_indices, "parallax"].to_numpy().reshape(-1, 21)
         values = dict()
         for col in ("mean_0", "mean_1", "cov_0", "cov_1", "cov_3", "n_stars_per_mas"):
@@ -92,31 +105,24 @@ class GaiaDensityEstimator:
 
         # Since the matrix is symmetric, we skip this one
         values["cov_2"] = values["cov_1"]
+        return values
 
-        # Query the multivar normal
+    def _query_multivariate_normal(self, map_values, pmra, pmdec):
         proper_motions = np.asarray([pmra, pmdec]).T
-        means = np.asarray([values["mean_0"], values["mean_1"]]).T
-        covariances = np.asarray([values[f"cov_{i}"] for i in range(4)]).T.reshape(
-            -1, 2, 2
+        means = np.asarray([map_values["mean_0"], map_values["mean_1"]]).T
+        covariances = np.asarray([map_values[f"cov_{i}"] for i in range(4)]).T
+
+        return vectorized_multivariate_normal(
+            proper_motions, means, covariances.reshape(-1, 2, 2)
         )
 
-        normal_values = vectorized_multivariate_normal(
-            proper_motions, means, covariances
-        )
-
+    def _convert_pdf_to_field_dens(self, map_values, pdf_values):
         density_per_degree = (
-            values["n_stars_per_mas"] * normal_values / self._HP7_PIXEL_AREA
+            map_values["n_stars_per_mas"] * pdf_values / self._HP7_PIXEL_AREA
         )
 
-        return density_per_degree * self._HP5_FIELD_AREA
-
-    def _generate_dataframe_indices(self, id_pix):
-        """The dataframe the map is stored in is 2D, but should really be 3D - this
-        quick indexing function grabs all required info at a given pixel.
-        """
-        return (
-            self._N_BINS * id_pix.reshape(-1, 1) + np.arange(self._N_BINS)
-        ).flatten()
+        density_per_field = density_per_degree * self._HP5_FIELD_AREA
+        return density_per_field
 
 
 class M10Estimator:
@@ -148,7 +154,7 @@ class MSubsampleEstimator:
     def __init__(self):
         self._map = pd.read_parquet(_CONFIG["data_dir"] / "subsample_cuts_hp7.parquet")
 
-    def __call__(self, l: ArrayLike, b: ArrayLike) -> ArrayLike:
+    def __call__(self, l: ArrayLike, b: ArrayLike) -> ArrayLike:  # noqa: E741
         """Estimates the median magnitude of stars removed from Gaia data by HR23's
         subsample cuts at the given l and b values.
 
