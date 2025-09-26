@@ -58,7 +58,8 @@ class GaiaDensityEstimator:
         Raises
         ------
         ValueError
-            When parallax values are outside of allowed range.
+            When parallax values are outside of allowed range, or when shapes of
+            arguments mismatch.
         """
         # Todo: check shapes too
         l, b, pmra, pmdec, parallax = (
@@ -68,6 +69,8 @@ class GaiaDensityEstimator:
             np.atleast_1d(pmdec),
             np.atleast_1d(parallax),
         )
+        if not l.shape == b.shape == pmra.shape == pmdec.shape == parallax.shape:
+            raise ValueError("Shapes of arguments must match.")
         if np.any(parallax > 2) or np.any(parallax < 0):
             raise ValueError(
                 "Parallax must be positive and less than 2 mas (i.e. distance > 500 pc.)"
@@ -80,14 +83,7 @@ class GaiaDensityEstimator:
         # Perform interpolations
         parallax_map = self._map.loc[df_indices, "parallax"].to_numpy().reshape(-1, 21)
         values = dict()
-        for col in (
-            "mean_0",
-            "mean_1",
-            "cov_0",
-            "cov_1",
-            "cov_3",
-            "n_stars_per_mas",
-        ):
+        for col in ("mean_0", "mean_1", "cov_0", "cov_1", "cov_3", "n_stars_per_mas"):
             values[col] = vectorized_1d_interpolation(
                 parallax,
                 parallax_map,
@@ -115,6 +111,9 @@ class GaiaDensityEstimator:
         return density_per_degree * self._HP5_FIELD_AREA
 
     def _generate_dataframe_indices(self, id_pix):
+        """The dataframe the map is stored in is 2D, but should really be 3D - this
+        quick indexing function grabs all required info at a given pixel.
+        """
         return (
             self._N_BINS * id_pix.reshape(-1, 1) + np.arange(self._N_BINS)
         ).flatten()
@@ -123,9 +122,7 @@ class GaiaDensityEstimator:
 class M10Estimator:
     @requires_data
     def __init__(self):
-        self._map = pd.read_parquet(
-            _CONFIG["data_dir"] / "m10_hp7.parquet"
-        )  # Todo make this
+        self._map = pd.read_parquet(_CONFIG["data_dir"] / "m10_hp7.parquet")
 
     def __call__(self, ra: ArrayLike, dec: ArrayLike) -> ArrayLike:
         """Returns value of m10 from Cantat-Gaudin+23 at the given ra/dec specified.
@@ -143,9 +140,7 @@ class M10Estimator:
             Values of m10 at the specified ra/dec.
         """
         healpix_level_7 = hp.ang2pix(2**7, ra, dec, nest=True, lonlat=True)
-
-        # Todo will need to change when using .parquet map
-        return self._map[healpix_level_7, 2].to_numpy()
+        return self._map.loc[healpix_level_7, "median_mag"].to_numpy()
 
 
 class MSubsampleEstimator:
