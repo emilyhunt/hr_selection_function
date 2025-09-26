@@ -981,7 +981,7 @@ requires-dist = [
     { name = "astropy-healpix", specifier = ">=1.0.0" },
     { name = "astroquery", specifier = ">=0.4.0" },
     { name = "gaiaunlimited", specifier = ">=0.3.0" },
-    { name = "healpy", specifier = ">=1.18.1" },
+    { name = "healpy", specifier = ">=1.13.0" },
     { name = "notebook", marker = "extra == 'notebooks'", specifier = ">=6.0.0" },
     { name = "numba", specifier = ">=0.50.0" },
     { name = "ocelot", marker = "extra == 'notebooks'", specifier = "==0.4.5" },
