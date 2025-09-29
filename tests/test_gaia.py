@@ -59,7 +59,7 @@ def test_MSubsampleEstimator():
 
 
 def test_GaiaDensityEstimator():
-    l, b, pmra, pmdec, parallax, result_expected = _get_test_density_data()  # noqa: E741
+    l, b, pmra, pmdec, parallax, result_expected = _get_test_density_data()
 
     model = GaiaDensityEstimator()
     result_actual = model(l, b, pmra, pmdec, parallax)
@@ -79,7 +79,7 @@ def _get_test_density_data(l_and_b=True):
         136.28666583570796,
         125.97131795417525,
         213.97631324679773,
-    ]  # noqa: E741
+    ]
     b = [
         -0.9346927099010592,
         3.6108482027563507,

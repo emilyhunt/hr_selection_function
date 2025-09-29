@@ -126,7 +126,7 @@ def get_test_cluster():
         l=np.linspace(0, 360, endpoint=False) * u.deg,
         b=np.linspace(-80, 80) * u.deg,
         distance=np.linspace(500, 5000) * u.pc,
-        frame="galactic"
+        frame="galactic",
     )
     mass = np.linspace(50, 5000)
     extinction = np.linspace(0, 5)

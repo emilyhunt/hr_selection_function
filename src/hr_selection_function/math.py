@@ -5,7 +5,7 @@ from numba import njit
 def vectorized_multivariate_normal(
     values: np.ndarray, means: np.ndarray, covariances: np.ndarray
 ) -> np.ndarray:
-    """Calculate the PDF of n_queries different multivariate normal distributions at 
+    """Calculate the PDF of n_queries different multivariate normal distributions at
     n_queries different points in a fast and vectorized way. Significantly faster than
     scipy.stats.multivariate_normal.pdf() when n_queries is large.
 

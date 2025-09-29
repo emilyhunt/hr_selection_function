@@ -100,7 +100,7 @@ def _check_data_directory(directory: Path | str) -> tuple[Path, bool]:
     if isinstance(directory, str):
         try:
             directory = Path(directory)
-        except Exception as e:
+        except Exception:
             raise ValueError(
                 f"Unable to cast user-specified directory '{directory}' into a path. "
                 "Are you sure it is a valid path on your operating system?"
@@ -125,7 +125,7 @@ def _check_data_directory(directory: Path | str) -> tuple[Path, bool]:
 
 def _check_data_downloaded(directory: Path | None = None) -> bool:
     # Todo this function should really check file size too
-    
+
     if directory is None:
         directory = _CONFIG["data_dir"]
     directory = Path(directory)
