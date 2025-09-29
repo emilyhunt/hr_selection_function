@@ -202,7 +202,10 @@ class HR24SelectionFunction:
         """Converts astropy SkyCoord input into Gaia data density at said location."""
         coords_icrs = coords.transform_to("icrs")
         coords_galactic = coords.transform_to("galactic")
-        l, b = coords_galactic.l.to(u.deg).value, coords_galactic.b.to(u.deg).value  # noqa: E741
+        l, b = (  # noqa: E741
+            coords_galactic.l.to(u.deg).value,
+            coords_galactic.b.to(u.deg).value,
+        )
         pmra, pmdec, distance = (
             coords_icrs.pm_ra_cosdec.to(u.mas / u.yr).value,
             coords_icrs.pm_dec.to(u.mas / u.yr).value,
@@ -272,16 +275,34 @@ class HR24SelectionFunction:
 
 
 class NStarsPredictor:
-    # Todo
     @requires_data
-    def __init__(self, n_models: int = 250):
-        if n_models > 250 or n_models < 1:
+    def __init__(self, models: int = 250):
+        """Trained XGBoost model that can predict the number of stars in a cluster and
+        the median parallax error of its member stars, as an alternative to simulating
+        an entire cluster with ocelot.
+
+        Try setting n_models to a lower value if this model is too slow to run (and if
+        accuracy isn't too important). Values of 10-50 can still get good predictions.
+
+        Parameters
+        ----------
+        models : int, optional
+            Number of ensemble models to use. Higher values linearly increase runtime
+            but increase accuracy and the number of samples available for uncertainty
+            prediction. Default: 250
+
+        Raises
+        ------
+        ValueError
+            On issue with input parameters.
+        """
+        if models > 250 or models < 1:
             raise ValueError("n_models must be between 1 and 250 (inclusive).")
 
         self._m10_estimator = M10Estimator()
         self._m_subsample_estimator = MSubsampleEstimator()
 
-        self.n_models = n_models
+        self.n_models = models
         self.models = []
         for i in range(self.n_models):
             model = XGBRegressor()
@@ -289,16 +310,14 @@ class NStarsPredictor:
             model.load_model(file)
             self.models.append(model)
 
-        self.columns = [
-            "ra",
-            "dec",
+        self.input_columns = [
             "mass",
             "extinction",
-            "distance",
             "log_age",
             "metallicity",
             "differential_extinction",
         ]
+
         self.model_columns = [
             "mass",
             "extinction",
@@ -310,11 +329,188 @@ class NStarsPredictor:
             "m_rybizki",
         ]
 
-    def __call__(self, data: pd.DataFrame, mode: str = "full"):
-        predictions = np.asarray(
-            [model.predict(data[self.model_columns]) for model in self.models]
-        )
+    def __call__(
+        self,
+        coordinates: SkyCoord,
+        data: pd.DataFrame | None = None,
+        mass: ArrayLike | None = None,
+        extinction: ArrayLike | None = None,
+        log_age: ArrayLike | None = None,
+        metallicity: ArrayLike | None = None,
+        differential_extinction: ArrayLike | None = None,
+        mode: str = "median",
+        verbose: bool = True,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """_summary_
 
+        Parameters
+        ----------
+        coordinates : SkyCoord
+            A (multi-object) array of astropy SkyCoord objects that include
+            a 3D position (can just be ra/dec/distance). Must be convertible into 3D
+            ICRS and Galactic coordinate systems.
+        data : pd.DataFrame | None, optional
+            pandas DataFrame of shape (n_clusters, n_features) containing the columns
+            mass [MSun], extinction [mag], log_age [log_10(yrs)], metallicity
+            [dex / M/H as in PARSEC models] and differential_extinction [mag], with
+            units in the square brackets. Default: None, meaning these columns need to
+            be specified with the arguments below.
+        mass : ArrayLike | None, optional
+            Mass of clusters of shape (n_clusters,) in units of solar masses.
+            Default: None
+        extinction : ArrayLike | None, optional
+            Extinction of clusters of shape (n_clusters,) in units of extinction in the
+            V-band. Default: None
+        log_age : ArrayLike | None, optional
+            Logarithmic age of clusters of shape (n_clusters,) in units of
+            log_10(age / yrs). Default: None.
+        metallicity : ArrayLike | None, optional
+            Metallicity of clusters of shape (n_clusters), specified in dex and in
+            metals/hydrogen (M/H) as in the PARSEC isochrones used to train
+            this model. Default: None
+        differential_extinction : ArrayLike | None, optional
+            Differential extinction of clusters of shape (n_clusters,) in units of
+            extinction in the V-band. Default: None
+        mode : str, optional
+            Mode to return predictions in. If "mean" or "median", returns two arrays
+            of shape (n_clusters,) which contain the number of stars & median parallax
+            error for each cluster, averaged over all models. If "full", returns
+            a full array for both number of stars and median parallax error of shape
+            (n_clusters, n_models), which can be used to extract uncertainty
+            information from the model ensemble. Default: "median"
+        verbose : bool, optional
+            Whether or not to print when running each model. Default: True
+
+        Returns
+        -------
+        np.ndarray
+            Predicted number of stars for each cluster, of shape (n_clusters,), or shape
+            (n_clusters, n_models) when mode=='full'.
+        np.ndarray
+            Predicted median parallax error of the member stars of each cluster, of
+            shape (n_clusters,), or shape (n_clusters, n_models) when mode=='full'.
+
+        Raises
+        ------
+        ValueError
+            On issue with input parameters.
+        """
+        data = self._process_input(
+            coordinates,
+            data,
+            mass,
+            extinction,
+            log_age,
+            metallicity,
+            differential_extinction,
+        )
+        full_predictions = self._query_models(data, verbose=verbose)
+        desired_predictions = self._convert_predictions(full_predictions, mode)
+        return desired_predictions
+
+    def _process_input(
+        self,
+        coordinates: SkyCoord,
+        data: pd.DataFrame | None = None,
+        mass: ArrayLike | None = None,
+        extinction: ArrayLike | None = None,
+        log_age: ArrayLike | None = None,
+        metallicity: ArrayLike | None = None,
+        differential_extinction: ArrayLike | None = None,
+    ) -> pd.DataFrame:
+        """Checks user input and returns all required things to calculate n_stars and
+        median_parallax_error.
+        """
+        if data is not None:
+            # Check we have enough columns
+            columns_in = [col in data.columns for col in self.input_columns]
+            if not all(columns_in):
+                raise ValueError(
+                    "Input data is missing columns. It must contain "
+                    f"{self.input_columns}"
+                )
+
+            # wow i wrote this code when tired didn't i
+            mass = data["mass"].to_numpy()
+            extinction = data["extinction"].to_numpy()
+            log_age = data["log_age"].to_numpy()
+            metallicity = data["metallicity"].to_numpy()
+            differential_extinction = data["differential_extinction"].to_numpy()
+
+        else:
+            args = (mass, extinction, log_age, metallicity, differential_extinction)
+            if any([x is None for x in args]):
+                raise ValueError(
+                    "When not specifying a database of arguments, ALL of mass, "
+                    "extinction, log_age, metallicity, and differential_extinction "
+                    "must instead be specified."
+                )
+
+        # Calculate other stuff
+        coordinates_icrs = coordinates.transform_to("icrs")
+        coordinates_galactic = coordinates.transform_to("galactic")
+        m10 = self._m10_estimator(
+            coordinates_icrs.ra.to(u.deg).value, coordinates_icrs.dec.to(u.deg).value
+        )
+        m_subsample = self._m_subsample_estimator(
+            coordinates_galactic.l.to(u.deg).value,
+            coordinates_galactic.b.to(u.deg).value,
+        )
+        distance = coordinates_galactic.distance.to(u.pc).value
+
+        # Create new DataFrame so we don't modify the user's, if they specified it
+        # I am also god-awfully afraid of getting a column out of order and fucking it
+        # all up so hence why we use a DataFrame internally, it's just easier IMO
+        data_for_xgboost = pd.DataFrame.from_dict(
+            dict(
+                mass=mass,
+                extinction=extinction,
+                distance=distance,
+                log_age=log_age,
+                metallicity=metallicity,
+                differential_extinction=differential_extinction,
+                m10=m10,
+                m_rybizki=m_subsample,
+            )
+        )
+        return data_for_xgboost
+
+    def _query_models(self, data: pd.DataFrame, verbose: bool = True) -> np.ndarray:
+        """Queries each model & converts predictions back into desired units."""
+        predictions = []
+        for i, model in enumerate(self.models, start=1):
+            if verbose:
+                print(f"\rQuerying model {i} of {len(self.models)}", end="")
+            predictions.append(model.predict(data[self.model_columns]))
+        predictions = np.asarray(predictions)
+
+        if verbose:
+            print("")
+
+        # Convert predictions back into n_stars & median_parallax_error
         predictions = np.transpose(predictions, (1, 0, 2))
         predictions[:, :, 0] = np.clip(10 ** predictions[:, :, 0] - 1, 0, np.inf)
         predictions[:, :, 1] = np.clip(10 ** predictions[:, :, 1], 0, np.inf)
+        return predictions
+
+    def _convert_predictions(
+        self, predictions: np.ndarray, mode: str
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Matches user's requested "mode" and converts into two arrays."""
+        match mode:
+            case "full":
+                return predictions[:, :, 0], predictions[:, :, 1]
+            case "median":
+                averages = np.median(predictions, axis=1)
+                return (
+                    averages[:, 0],
+                    averages[:, 1],
+                )
+            case "mean":
+                averages = np.mean(predictions, axis=1)
+                return (
+                    averages[:, 0],
+                    averages[:, 1],
+                )
+            case _:
+                raise ValueError(f"Specified mode '{mode}' not recognized.")
