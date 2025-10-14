@@ -4,6 +4,7 @@ from tqdm import tqdm
 from pathlib import Path
 from functools import wraps
 import shutil
+import hashlib
 
 
 def set_data_directory(directory: Path | str):
@@ -27,7 +28,12 @@ def download_data(redownload: bool = False):
     if _CONFIG["data_already_downloaded"] and redownload is False:
         return
 
-    _download_file(_CONFIG["data_url"], unzip=True, write_location=_CONFIG["data_dir"])
+    _download_file(
+        _CONFIG["data_url"],
+        unzip=True,
+        write_location=_CONFIG["data_dir"],
+        hash_to_check=_CONFIG["data_md5_hash"],
+    )
     if not _check_data_downloaded():
         raise RuntimeError(
             "Data download failed. Data is not as expected, or where it should be."
@@ -52,6 +58,7 @@ def _download_file(
     data_link: str,
     unzip: bool = True,
     write_location: Path | None = None,
+    hash_to_check: str | None = None,
 ):
     """Downloads a file at a given path. Can also unzip it."""
     if write_location is None:
@@ -73,24 +80,44 @@ def _download_file(
             unit_scale=True,
             unit_divisor=1024**3,
             miniters=1,
-            desc="Data",
             total=int(response.headers.get("content-length", 0)),
         ) as file:
-            for chunk in response.iter_content(chunk_size=4096):
+            for chunk in response.iter_content(chunk_size=1024**2):  # Chunk 1 MB / time
                 file.write(chunk)
 
+    # Optionally check hash
+    if hash_to_check is not None:
+        print("Checking file md5 hash")
+        _check_md5_hash(write_location, hash_to_check)
+        print("File hash is good - download was successful")
+
+    # Optionally unzip data
     if not unzip:
         return
 
-    # Unzip data
-    print(f"Unzipping data to {write_location}")
+    print(f"Unzipping data to {write_location.parent}")
     shutil.unpack_archive(write_location, write_location.parent)
 
     # Delete raw .zip file
     print(f"Removing .zip file at {write_location}")
     write_location.unlink()
 
-    print("Data downloaded!")
+    print("Data downloaded successfully.")
+
+
+def _check_md5_hash(file: Path | str, expected_hash: str):
+    with open(file, "rb") as f:
+        file_hash = hashlib.md5()
+        while chunk := f.read(1024**2):
+            file_hash.update(chunk)
+
+    actual_hash = file_hash.hexdigest()
+    if actual_hash != expected_hash:
+        raise RuntimeError(
+            "md5 hash of downloaded file does not match expected file. Your download "
+            "was likely corrupted, and will need to be repeated."
+            f"Expected hash: {expected_hash}\nActual hash: {actual_hash}"
+        )
 
 
 def _check_data_directory(directory: Path | str) -> tuple[Path, bool]:
@@ -113,9 +140,9 @@ def _check_data_directory(directory: Path | str) -> tuple[Path, bool]:
     first_time = False
     if not directory.exists():
         print(
-            "This looks like your first time running the hr_selection_function package "
-            "/ with this data directory. Trying to create data directory at "
-            f"{directory}..."
+            "This looks like your first time running the hr_selection_function package,"
+            " or at least with this data directory.\nTrying to create data directory at"
+            f" {directory}..."
         )
         directory.mkdir(parents=True)
         first_time = True

@@ -13,4 +13,8 @@ if _DEFAULT_DIRECTORY is None:
     _DEFAULT_DIRECTORY = Path.home() / ".hr_selection_function"
 
 # Some hard defaults
-_CONFIG["data_url"] = "https://example.com"  # Todo
+# See https://github.com/zenodo/zenodo/issues/1629 for how to get this link
+_CONFIG["data_url"] = (
+    "https://zenodo.org/api/records/17350533/files/hr_selection_function.zip/content"
+)
+_CONFIG["data_md5_hash"] = "62ca0bcd5d4a76acf6ea7c2308e18f3e"

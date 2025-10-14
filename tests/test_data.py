@@ -90,7 +90,7 @@ def test__check_data_directory():
 
 
 def test_download_data():
-    warnings.warn("Todo once data is online somewhere")
+    warnings.warn("Todo once data is online somewhere. md5 hash is also not tested!")
 
 
 def test__check_data_downloaded():
