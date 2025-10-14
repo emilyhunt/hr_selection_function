@@ -11,7 +11,16 @@ The package can be installed via pip with
 pip install hr_selection_function
 ```
 
-It will handle fetching data automatically.
+Note that installation on Windows is probably not possible at this time, as [healpy](https://github.com/healpy/healpy) does not support Windows.
+
+The package will handle fetching data [from Zenodo](https://zenodo.org/records/17350533) automatically. You can control which directory is used for storing data either with the `HRSF_DATA` environment variable, or by calling `set_data_directory` **every time** you use the package:
+
+```python
+from hr_selection_function import set_data_directory
+set_data_directory("/path/to/desired/location")
+```
+
+Otherwise, data is stored by default at `$HOME/.hr_selection_function`.
 
 
 ## Basic use
@@ -85,6 +94,11 @@ n_stars_predicted, median_parallax_error_predicted = nstars_model(
 ```
 
 You can find more examples in the 'examples' directory.
+
+
+## Issues
+
+If you encounter any problems with using the package, then please raise an issue on [GitHub](https://github.com/emilyhunt/hr_selection_function/issues).
 
 
 ## Developing
