@@ -421,6 +421,8 @@ class NStarsPredictor:
         """Checks user input and returns all required things to calculate n_stars and
         median_parallax_error.
         """
+        # Todo need to check that arguments are in correct range
+
         if data is not None:
             # Check we have enough columns
             columns_in = [col in data.columns for col in self.input_columns]
