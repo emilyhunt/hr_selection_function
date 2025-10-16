@@ -96,6 +96,20 @@ n_stars_predicted, median_parallax_error_predicted = nstars_model(
 You can find more examples in the 'examples' directory.
 
 
+## Documentation
+
+Although the package does not have a documentation page (it's a bit small for that!), all the user-facing functions (such as the `HR24SelectionFunction` class) have function documentation that you can get with `help()` in Python - e.g. like this:
+
+```python
+# To get the function docs of the sf itself:
+help(HR24SelectionFunction)
+
+# To get the function docs of the __call__() method of the sf:
+sf = HR24SelectionFunction()
+help(sf)
+```
+
+
 ## Issues
 
 If you encounter any problems with using the package, then please raise an issue on [GitHub](https://github.com/emilyhunt/hr_selection_function/issues).
