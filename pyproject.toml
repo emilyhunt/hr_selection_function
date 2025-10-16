@@ -1,5 +1,5 @@
 [project]
-name = "hr-selection-function"
+name = "hr_selection_function"
 version = "0.1.0"
 description = "Selection function for the Hunt & Reffert 2024 open cluster catalogue."
 readme = "README.md"
