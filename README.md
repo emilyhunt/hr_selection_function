@@ -1,6 +1,9 @@
-# hr_selection_function
+[![PyPI](https://img.shields.io/badge/PyPI-package-blue.svg)](https://pypi.org/project/hr-selection-function/)
 
-The following package contains a selection function for the [Hunt & Reffert 2024 open cluster catalogue](https://ui.adsabs.harvard.edu/abs/2024A%26A...686A..42H/abstract), as presented in Hunt et al. 2025/2026 (year & reference TBC.)
+
+# The selection function of the Hunt & Reffert 2024 open cluster catalogue
+
+What is the probability that a real open cluster, somewhere in our galaxy, appeared in the Hunt & Reffert 2024 catalogue? The following package contains a selection function for the [Hunt & Reffert 2024 open cluster catalogue](https://ui.adsabs.harvard.edu/abs/2024A%26A...686A..42H/abstract), as presented in Hunt et al. 2025/2026 (year & reference TBC.)
 
 
 ## Installation
@@ -8,12 +11,12 @@ The following package contains a selection function for the [Hunt & Reffert 2024
 The package can be installed via pip with
 
 ```bash
-pip install hr_selection_function
+pip install hr-selection-function
 ```
 
-Note that installation on Windows is probably not possible at this time, as [healpy](https://github.com/healpy/healpy) does not support Windows.
+Note that installation on Windows is probably not possible at this time, as [healpy](https://github.com/healpy/healpy) does not support Windows. Python 3.10 or greater is recommended.
 
-The package will handle fetching data [from Zenodo](https://zenodo.org/records/17350533) automatically. You can control which directory is used for storing data either with the `HRSF_DATA` environment variable, or by calling `set_data_directory` **every time** you use the package:
+The package will handle fetching data [from Zenodo](https://zenodo.org/records/17350533) automatically, which will use about **500 MB of disk space**. You can control which directory is used for storing data either with the `HRSF_DATA` environment variable, or by calling `set_data_directory` **every time** you use the package:
 
 ```python
 from hr_selection_function import set_data_directory
@@ -30,7 +33,7 @@ This library contains two main models:
 - A predictor of detection probability as a function of number of stars & median parallax error of a cluster, `hr_selection_function.HR24SelectionFunction`.
 - A 'cluster simulator' that can predict number of stars and median parallax error based on fundamental cluster parameters, `hr_selection_function.NStarsPredictor`.
 
-The former is super easy to use. It takes three arguments: Gaia data density ($\rho_\mathrm{data}$ in the paper), number of stars, median parallax error, and your chosen significance threshold.
+The former is super easy to use. It takes three arguments: Gaia data density ($\rho_\mathrm{data}$ in the paper), number of stars, median parallax error (in milliarcseconds), and your chosen significance threshold.
 
 ```python
 import numpy as np
@@ -77,11 +80,11 @@ from hr_selection_function import NStarsPredictor
 nstars_model = NStarsPredictor(models=10)
 
 # Pick values to query
-mass = np.linspace(50, 5000)
-extinction = np.full(50, 1)
-log_age = np.full(50, 7.5)
-metallicity = np.full(50, 0.0)
-differential_extinction = np.full(50, 0.2)
+mass = np.linspace(50, 5000)  # MSun
+extinction = np.full(50, 1)  # mag (A_V)
+log_age = np.full(50, 7.5)  # log_10(years)
+metallicity = np.full(50, 0.0)  # dex / [M/H]
+differential_extinction = np.full(50, 0.2)  # mag (A_V)
 
 n_stars_predicted, median_parallax_error_predicted = nstars_model(
     coordinates, 

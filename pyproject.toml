@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Models and source code for the Hunt et al. 2025/2026 paper 'The selection function of the Gaia DR3 open cluster census', which establishes the selection function for the Hunt & Reffert 2024 open cluster catalogue."
 readme = "README.md"
 authors = [{ name = "emilyhunt", email = "emily.hunt.physics@gmail.com" }]
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 dependencies = [
   "astropy>=5.0.0",
   "astropy-healpix>=1.0.0",
