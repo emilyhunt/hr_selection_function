@@ -1,6 +1,6 @@
 [project]
 name = "hr_selection_function"
-version = "1.0.0"
+version = "1.0.1"
 description = "Models and source code for the Hunt et al. 2025/2026 paper 'The selection function of the Gaia DR3 open cluster census', which establishes the selection function for the Hunt & Reffert 2024 open cluster catalogue."
 readme = "README.md"
 authors = [{ name = "emilyhunt", email = "emily.hunt.physics@gmail.com" }]
